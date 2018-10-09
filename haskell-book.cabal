@@ -60,6 +60,15 @@ executable haskell-book
   build-depends:       base >=4.9 && <4.10
                      , trifecta >=2
                      , transformers >= 0.5.2.0
+                     , parsers >= 0.12.9
+                     , raw-strings-qq >= 1.1
+                     , bytestring >= 0.10.8.1
+                     , containers >= 0.5.7.1
+                     , text >= 1.2.3.0
+                     , hspec >= 2.5.8
+                     , attoparsec >= 0.13.2.2
+                     , parsec >= 3.1.13.0
+                     , aeson >= 1.4.0.0
   
   -- Directories containing source files.
   -- hs-source-dirs:      
