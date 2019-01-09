@@ -2,6 +2,11 @@
 
 module Chap26 where
 
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader (Reader(..), Reader, reader)
+import Chap25 (IdentityT(..), Identity(..), Identity)
+
 newtype MaybeT m a =
   MaybeT { runMaybeT :: m (Maybe a) }
 
@@ -53,6 +58,29 @@ swapEitherT (EitherT mea) = EitherT $ fmap swapEither mea
 eitherT :: Monad m => (a -> m c) -> (b -> m c) -> EitherT a m b -> m c
 eitherT f g (EitherT mab) = mab >>= (either f g)
 
+newtype ReaderT r m a =
+  ReaderT { runReaderT :: r -> m a }
+
+instance (Functor m) => Functor (ReaderT r m) where
+  fmap f (ReaderT rma) =
+    ReaderT $ (fmap . fmap) f rma
+
+instance (Applicative m) => Applicative (ReaderT r m) where
+  pure = ReaderT . pure . pure
+  (ReaderT fmab) <*> (ReaderT rma) =
+    ReaderT $ (<*>) <$> fmab <*> rma
+
+instance (Monad m) => Monad (ReaderT r m) where
+  return = pure
+
+  (>>=) :: ReaderT r m a
+        -> (a -> ReaderT r m b)
+        -> ReaderT r m b
+  (ReaderT rma) >>= f =
+    ReaderT $ \r -> do
+      a <- rma r
+      runReaderT (f a) r
+
 newtype StateT s m a =
   StateT { runStateT :: s -> m (a, s) }
 
@@ -77,3 +105,51 @@ instance (Monad m) => Monad (StateT s m) where
                 \s -> do
                   (a, s') <- sma s
                   runStateT (f a) s'
+
+instance MonadTrans IdentityT where
+  lift = IdentityT
+
+instance MonadTrans MaybeT where
+  lift = MaybeT . fmap Just
+
+instance MonadTrans (ReaderT r) where
+  lift = ReaderT . const
+
+instance MonadTrans (EitherT e) where
+  lift = EitherT . fmap Right
+
+instance MonadTrans (StateT s) where
+  lift ma = StateT $ \s -> do
+                        a <- ma
+                        return (a, s)
+
+instance (MonadIO m) => MonadIO (IdentityT m) where
+  liftIO = IdentityT . liftIO
+
+instance (MonadIO m) => MonadIO (EitherT e m) where
+  liftIO = lift . liftIO
+
+instance (MonadIO m) => MonadIO (MaybeT m) where
+  liftIO = lift . liftIO
+
+instance (MonadIO m) => MonadIO (ReaderT r m) where
+  liftIO = lift . liftIO
+
+instance (MonadIO m) => MonadIO (StateT s m) where
+  liftIO = lift . liftIO
+
+rDec :: Num a => Reader a a
+rDec = reader $ flip (-) 1
+
+rShow :: Show a => ReaderT a Identity String
+rShow = ReaderT $ Identity . show
+
+rPrintAndInc :: (Num a, Show a) => ReaderT a IO a
+rPrintAndInc = ReaderT $ \x -> do
+                            putStrLn ("Hi: " ++ show x) 
+                            return (x + 1)
+
+sPrintIncAccum :: (Num a, Show a) => StateT a IO String
+sPrintIncAccum = StateT $ \x -> do
+                             putStrLn ("Hi: " ++ show x)
+                             return (show x, x + 1)
